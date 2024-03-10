@@ -42,9 +42,8 @@ var (
 		errInsertUser: errors.New("DB Error"),
 	}
 
-	positiveRequest         = []byte(`{"mdn":"6281987876654", "password":"123", "confirmPassword": "123"}`)
-	negativeRequest         = []byte(`I AM JSON`)
-	passwordNotMatchRequest = []byte(`{"mdn":"6281987876654", "password":"123", "confirmPassword": "abc"}`)
+	positiveRequest = []byte(`{"mdn":"6281987876654", "password":"123"}`)
+	negativeRequest = []byte(`I AM JSON`)
 )
 
 func TestUserService_Register(t *testing.T) {
@@ -76,12 +75,6 @@ func TestUserService_Register(t *testing.T) {
 			request:          positiveRequest,
 			userProcessor:    existFindUserByMdn,
 			expectedResponse: utils.ErrUserAlreadyExist,
-		},
-		{
-			testName:         "Negative Test: Password Not Match",
-			request:          passwordNotMatchRequest,
-			userProcessor:    positiveRegisterUser,
-			expectedResponse: utils.ErrPasswordNotMatch,
 		},
 		{
 			testName:         "Negative Test: Failed Register User",

@@ -67,8 +67,10 @@ func (svc TransactionService) Create(b []byte) models.Response {
 	}
 	logs.Info("transaction request: %+v", request)
 
-	if request.InvoiceType == "TENANT" {
-		_, err := svc.userFinder.FindByPubID(request.UserPubID)
+	var user models.User
+	var err error
+	if request.UserPubID != "" {
+		user, err = svc.userFinder.FindByPubID(request.UserPubID)
 		if err != nil {
 			logs.Warn("[%d] Failed to find user: %s", svc.Identifier, err.Error())
 			return models.ResponseError(utils.MsgUserNotFound, utils.ErrUserNotFound)
@@ -76,31 +78,62 @@ func (svc TransactionService) Create(b []byte) models.Response {
 	}
 
 	svc.o.Begin()
-	trx, err := svc.trxProcessor.Insert(request.ToInsertReq(0))
+	trx, err := svc.trxProcessor.Insert(request.ToInsertReq())
 	if err != nil {
 		svc.o.Rollback()
 		logs.Warn("[%d] Failed to insert voucher: %s", svc.Identifier, err.Error())
 		return models.ResponseError(utils.MsgErrDefault, utils.ErrDefault)
 	}
 
-	if request.InvoiceType == "SHOP" {
-		user, _ := svc.userFinder.FindByPubID(request.UserPubID)
-		if request.Amount >= beego.AppConfig.DefaultFloat("minTransactionAmount", 1000000) && user.PubID != "" && request.VoucherCode != "" {
-			_, err := svc.voucherDetailProcessor.FindGivenByCodeAndUserPubID(request.VoucherCode, request.UserPubID)
-			if err != nil {
-				logs.Warn("[%d] Failed to find Voucher: %s", svc.Identifier, err.Error())
-				return models.ResponseError(utils.MsgVoucherNotFound, utils.ErrVoucherNotFound)
-			}
+	if request.VoucherCode != "" {
+		vd, err := svc.voucherDetailProcessor.FindGivenByCodeAndUserPubID(request.VoucherCode, user.PubID)
+		if err != nil {
+			logs.Warn("[%d] Failed to find Voucher Detail: %s", svc.Identifier, err.Error())
+			return models.ResponseError(utils.MsgVoucherNotFound, utils.ErrVoucherNotFound)
 		}
 
-		if request.Amount >= beego.AppConfig.DefaultFloat("minTransactionAmount", 1000000) && user.PubID != "" && request.ReferenceID != "" {
-			trxTenant, err := svc.trxProcessor.FindTransactionByPubIDAndTypeAndUserPubID(request.ReferenceID, "TENANT", request.UserPubID)
+		voucher, err := svc.voucherProcessor.FindVoucherByID(vd.Voucher.ID)
+		if err != nil {
+			logs.Warn("[%d] Failed to find Voucher: %s", svc.Identifier, err.Error())
+			return models.ResponseError(utils.MsgVoucherNotFound, utils.ErrVoucherNotFound)
+		}
+
+		now := time.Now()
+		if now.After(voucher.StartTs) && now.Before(voucher.EndTs) {
+			trx.ChargeAmount = trx.Amount - voucher.VoucherAmount
+			trx.UpdateTs = time.Now()
+			err = svc.trxProcessor.UpdateColumns(trx, "charge_amount", "update_ts")
 			if err != nil {
+				svc.o.Rollback()
+				logs.Warn("[%d] Failed to update transaction voucher: %s", svc.Identifier, err.Error())
+				return models.ResponseError(utils.MsgErrDefault, utils.ErrDefault)
+			}
+
+			vd.Status = "REDEEMED"
+			vd.RedeemTs = time.Now()
+			err = svc.voucherDetailProcessor.UpdateColumns(vd, "status", "redeem_ts")
+			if err != nil {
+				svc.o.Rollback()
+				logs.Warn("[%d] Failed to update voucher detail: %s", svc.Identifier, err.Error())
+				return models.ResponseError(utils.MsgErrDefault, utils.ErrDefault)
+			}
+		} else {
+			logs.Warn("[%d] Voucher not eligible to redeem", svc.Identifier)
+			return models.ResponseError(utils.MsgVoucherNotEligibleRedeem, utils.ErrVoucherNotEligibleRedeem)
+		}
+	}
+
+	if request.InvoiceType == "SHOP" {
+		if request.Amount >= beego.AppConfig.DefaultFloat("minTransactionAmount", 1000000) && request.ReferenceID != "" {
+			trxTenant, err := svc.trxProcessor.FindTransactionByPubIDAndTypeAndUserPubID(request.ReferenceID, "TENANT", user.PubID)
+			if err != nil {
+				svc.o.Rollback()
 				logs.Warn("[%d] Failed to reference invoice: %s", svc.Identifier, err.Error())
 				return models.ResponseError(utils.MsgReferenceNotFound, utils.ErrReferenceNotFound)
 			}
 
 			if !trxTenant.IsEligibleVoucher {
+				svc.o.Rollback()
 				logs.Warn("[%d] Reference is not eligible to get voucher", svc.Identifier)
 				return models.ResponseError(utils.MsgReferenceNotEligible, utils.ErrReferenceNotEligible)
 			}
@@ -127,18 +160,11 @@ func (svc TransactionService) Create(b []byte) models.Response {
 			}
 
 			trxTenant.IsEligibleVoucher = false
-			err = svc.trxProcessor.UpdateColumns(trxTenant, "is_eligible_voucher")
+			trxTenant.UpdateTs = time.Now()
+			err = svc.trxProcessor.UpdateColumns(trxTenant, "is_eligible_voucher", "update_ts")
 			if err != nil {
 				svc.o.Rollback()
 				logs.Warn("[%d] Failed to update transaction tenant: %s", svc.Identifier, err.Error())
-				return models.ResponseError(utils.MsgErrDefault, utils.ErrDefault)
-			}
-
-			trx.IsEligibleVoucher = false
-			err = svc.trxProcessor.UpdateColumns(trx, "charge_amount", "is_eligible_voucher")
-			if err != nil {
-				svc.o.Rollback()
-				logs.Warn("[%d] Failed to update transaction: %s", svc.Identifier, err.Error())
 				return models.ResponseError(utils.MsgErrDefault, utils.ErrDefault)
 			}
 		}

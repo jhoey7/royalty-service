@@ -33,13 +33,18 @@ type CreateTrxReq struct {
 }
 
 // ToInsertReq func
-func (ctr CreateTrxReq) ToInsertReq(voucherAmount float64) Transaction {
+func (ctr CreateTrxReq) ToInsertReq() Transaction {
+	isEligible := false
+	if ctr.InvoiceType == "TENANT" {
+		isEligible = true
+	}
 	return Transaction{
-		InvoicePubID: fmt.Sprintf("%X", time.Now().UnixNano()),
-		Amount:       ctr.Amount,
-		ChargeAmount: ctr.Amount - voucherAmount,
-		UserPubID:    ctr.UserPubID,
-		CreateTs:     time.Now(),
-		InvoiceType:  ctr.InvoiceType,
+		InvoicePubID:      fmt.Sprintf("%X", time.Now().UnixNano()),
+		Amount:            ctr.Amount,
+		ChargeAmount:      ctr.Amount,
+		UserPubID:         ctr.UserPubID,
+		CreateTs:          time.Now(),
+		InvoiceType:       ctr.InvoiceType,
+		IsEligibleVoucher: isEligible,
 	}
 }
