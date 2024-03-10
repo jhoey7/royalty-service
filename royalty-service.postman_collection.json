@@ -1,0 +1,113 @@
+{
+	"info": {
+		"_postman_id": "3d9d64c7-7c90-4886-8b9c-304e0bf44cba",
+		"name": "royalty-service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "14665669"
+	},
+	"item": [
+		{
+			"name": "Register",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"john.doe@gmail.com\",\n    \"mdn\": \"6281787765456\",\n    \"username\": \"john\",\n    \"name\": \"John Doe\",\n    \"address\": \"Jl. Pangandaran 100\",\n    \"dateOfBirth\": \"1992-01-01\",\n    \"gender\": \"M\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8000/1.0/users/register",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"1.0",
+						"users",
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Vouchers",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"startTs\": \"2024-03-01 00:00:01\",\n\t\"endTs\": \"2024-05-30 23:59:59\",\n\t\"totalBudget\": 1000000,\n\t\"voucherAmount\": 10000\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8000/1.0/vouchers",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"1.0",
+						"vouchers"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"amount\": 1000000,\n\t\"voucherCode\": \"\",\n\t\"userPubId\": \"839c4479-7cb5-4783-a72a-534f043d83f5\",\n    \"referenceId\": \"17BB466E663D4EE0\",\n\t\"invoiceType\": \"SHOP\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8000/1.0/transactions",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"1.0",
+						"transactions"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
